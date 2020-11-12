@@ -651,15 +651,20 @@ static __attribute__((noinline)) void clean_exit(int ret)
 	for (i = 0; i < opt.nbcpu; i++)
 	{
 #ifndef CYGWIN
-		safe_write(mc_pipe[i][1], (void *) "EXIT\r", 5);
-		safe_write(bf_pipe[i][1], (void *) tmpbuf, 64);
+		if (mc_pipe[i][1] != -1)
+			safe_write(mc_pipe[i][1], (void *) "EXIT\r", 5);
+		if (bf_pipe[i][1] != -1) safe_write(bf_pipe[i][1], (void *) tmpbuf, 64);
 #endif
-		close(mc_pipe[i][0]);
-		close(mc_pipe[i][1]);
-		close(cm_pipe[i][0]);
-		close(cm_pipe[i][1]);
-		close(bf_pipe[i][0]);
-		close(bf_pipe[i][1]);
+		if (mc_pipe[i][0] != -1) close(mc_pipe[i][0]);
+		if (mc_pipe[i][1] != -1) close(mc_pipe[i][1]);
+		if (cm_pipe[i][0] != -1) close(cm_pipe[i][0]);
+		if (cm_pipe[i][1] != -1) close(cm_pipe[i][1]);
+		if (bf_pipe[i][0] != -1) close(bf_pipe[i][0]);
+		if (bf_pipe[i][1] != -1) close(bf_pipe[i][1]);
+
+		mc_pipe[i][0] = mc_pipe[i][1] = -1;
+		cm_pipe[i][0] = cm_pipe[i][1] = -1;
+		bf_pipe[i][0] = bf_pipe[i][1] = -1;
 	}
 
 	// Stop cracking session thread
@@ -2321,9 +2326,9 @@ static __attribute__((always_inline)) float chrono(struct timeval * start,
 
 static ssize_t safe_read(int fd, void * buf, size_t len)
 {
-	REQUIRE(fd >= 0);
 	REQUIRE(buf != NULL);
 	REQUIRE(len > 0);
+	if (fd < 0) return (-1);
 
 	ssize_t n;
 	size_t sum = 0;
@@ -2354,9 +2359,9 @@ static ssize_t safe_read(int fd, void * buf, size_t len)
 
 static ssize_t safe_write(int fd, void * buf, size_t len)
 {
-	REQUIRE(fd >= 0);
 	REQUIRE(buf != NULL);
 	REQUIRE(len > 0);
+	if (fd < 0) return (-1);
 
 	ssize_t n;
 	size_t sum = 0;
@@ -5877,6 +5882,10 @@ int main(int argc, char * argv[])
 	memset(&opt, 0, sizeof(opt));
 
 	rand_init();
+
+	memset(&mc_pipe[0][0], -1, sizeof(mc_pipe));
+	memset(&cm_pipe[0][0], -1, sizeof(cm_pipe));
+	memset(&bf_pipe[0][0], -1, sizeof(bf_pipe));
 
 #if DYNAMIC
 	// Load the best available shared library, or the user specified one.
